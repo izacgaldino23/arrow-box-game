@@ -20,12 +20,17 @@ function setup () {
 
 	colors.tile = color(220)
 	colors.clickedTile = color(200, 50, 50)
+	colors.lineColor = color(20)
 
 	generateGrid();
 
 	completeTiles();
 
 	// noStroke();
+	stroke(colors.lineColor)
+	// strokeCap(ROUND)
+	// strokeWeight(4)
+
 	textAlign(CENTER, CENTER)
 	textSize(15)
 }
@@ -45,9 +50,17 @@ function draw () {
 
 function mouseClicked () {
 	// verify is is clicked inside a tile
-	for (let t of tiles) {
+	for (let i in tiles) {
+		t = tiles[ i ]
 		if (t.isInside(mouseX - xGrid, mouseY - yGrid)) {
+			console.log(t)
 			t.color = colors.clickedTile
+
+			if (t.move()) {
+				tiles.splice(i, 1)
+			}
+
+			break
 		}
 	}
 }
@@ -170,7 +183,7 @@ function isValidTile (tile, x, y) {
 
 function drawGuideLines () {
 	push();
-	stroke(0, 150);
+	stroke(colors.lineColor);
 	for (let i = 0; i <= gridSizeX; i++) {
 		line(i * tileSize, 0, i * tileSize, tileSize * gridSizeY);
 	}
@@ -382,15 +395,23 @@ class Tile {
 		let verticals = []
 		let horizontals = []
 
-		// Lines and rows from this tile
-		if (this.xDirection != 0) {
+		if (this.verticals) {
+			verticals = this.verticals
+			horizontals = this.horizontals
+		} else {
+			verticals = []
+			horizontals = []
+
+			// Lines and rows from this tile
 			for (let i = 0; i < this.sizeY; i++) {
 				verticals.push(this.y + i)
 			}
-		} else if (this.yDirection != 0) {
 			for (let i = 0; i < this.sizeX; i++) {
 				horizontals.push(this.x + i)
 			}
+
+			this.verticals = verticals
+			this.horizontals = horizontals
 		}
 
 		// Verify if has any equals lines and rows
@@ -406,10 +427,34 @@ class Tile {
 
 		return false
 	}
+
+	// return true if exits from the grid
+	move () {
+		// The move is based of direction of this tile
+
+		// up = 0
+		if (this.direction == 0) {
+			// If is on up border
+			if (this.y == 0) {
+				return true
+			} else {
+				// Validate if has any other tile in the path
+				let actualX = this.x
+				let max = actualX
+				for (let tile of tiles) {
+					for (let y of this.horizontals) {
+						grid[ actualX ]
+					}
+				}
+			}
+		}
+
+		return false
+	}
 }
 
 // ======================
-const tilePadding = 8;
+const tilePadding = 4;
 const tileEndWithPadding = tileSize - tilePadding;
 const tileLongEndWithPadding = (size) => tileSize * size - tilePadding;
 
