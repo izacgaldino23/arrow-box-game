@@ -1,17 +1,15 @@
-const [ gridSizeX, gridSizeY ] = [ 20, 20 ];
+const [ gridSizeX, gridSizeY ] = [ 5, 5 ];
 const tileSize = 40;
-const initialTiles = 80;
-const debug = true
+const initialTiles = 5;
+const debug = false
 let grid = [];
-
 let tiles = [];
 let tries = [];
-
-let xGrid, yGrid;
-
 let tileID = 1
 
+let xGrid, yGrid;
 let colors = {}
+let reversed = false
 
 function setup () {
 	createCanvas(1000, 1000);
@@ -23,9 +21,7 @@ function setup () {
 	colors.clickedTile = color(200, 50, 50)
 	colors.lineColor = color(20)
 
-	generateGrid();
-
-	completeTiles();
+	startGame()
 
 	// noStroke();
 	stroke(colors.lineColor)
@@ -41,7 +37,7 @@ function draw () {
 
 	translate(xGrid, yGrid);
 
-	drawGuideLines();
+	// drawGuideLines();
 	tiles.map((t) => {
 		t.draw();
 	});
@@ -53,22 +49,35 @@ function draw () {
 function mouseClicked () {
 	// verify is is clicked inside a tile
 	for (let i in tiles) {
+		if (i == 0) console.log('teste')
 		t = tiles[ i ]
 		if (t.isInside(mouseX - xGrid, mouseY - yGrid)) {
 			debugConsole(t)
-			t.color = colors.clickedTile
+			// t.color = colors.clickedTile
 
 			if (t.move()) {
-				t.cleanGrid()
+				t.removeFromGrid()
 				tiles.splice(i, 1)
 			}
 
 			break
 		}
 	}
+
+	if (tiles.length == 0) startGame()
 }
 
 // ===================== Game functions
+
+function startGame () {
+	grid = [];
+	tiles = [];
+	tries = [];
+	tileID = 1
+
+	generateGrid();
+	completeTiles();
+}
 
 function generateGrid () {
 	for (let i = 0; i < gridSizeX; i++) {
@@ -129,7 +138,10 @@ function generateTile (tempType, tempX, tempY) {
 }
 
 function completeTiles () {
-	typeOftiles.reverse()
+	if (!reversed) {
+		typeOftiles.reverse()
+		reversed = true
+	}
 	for (let i = 0; i < gridSizeY; i++) {
 		for (let j = 0; j < gridSizeX; j++) {
 			value = grid[ j ][ i ];
@@ -253,11 +265,6 @@ function debugConsole (...params) {
 	if (debug) console.log(...params)
 }
 
-function condition (direction, first, second) {
-	if (direction < 0) return first >= second
-	else if (direction > 0) return first <= second
-}
-
 // ===================== CLASSES
 
 class Tile {
@@ -276,13 +283,6 @@ class Tile {
 
 		this.direction = this.generateDirection()
 
-		this.center = createVector(
-			// (this.points[ 1 ].x + this.points[ 7 ].x) / 2,
-			// (this.points[ 1 ].y + this.points[ 7 ].y) / 2
-			(this.points[ 0 ].x + this.points[ 2 ].x) / 2,
-			(this.points[ 0 ].y + this.points[ 2 ].y) / 2
-		);
-
 		this.color = colors.tile
 	}
 
@@ -295,6 +295,13 @@ class Tile {
 		this.originalPoints.map((p) => {
 			this.points.push(createVector(x + p[ 0 ], y + p[ 1 ]));
 		});
+
+		this.center = createVector(
+			// (this.points[ 1 ].x + this.points[ 7 ].x) / 2,
+			// (this.points[ 1 ].y + this.points[ 7 ].y) / 2
+			(this.points[ 0 ].x + this.points[ 2 ].x) / 2,
+			(this.points[ 0 ].y + this.points[ 2 ].y) / 2
+		);
 	}
 
 	draw () {
@@ -358,6 +365,7 @@ class Tile {
 	generateDirection () {
 		let direction, oposite = true
 		this.stack = 100
+		this.calculateArea()
 
 		while (oposite) {
 			direction = Math.floor(random(4)); // 0 = up, 1 = right, 2 = down, 3 = left
@@ -426,36 +434,14 @@ class Tile {
 	}
 
 	isParallel (tile) {
-		let verticals = []
-		let horizontals = []
-
-		if (this.verticals) {
-			verticals = this.verticals
-			horizontals = this.horizontals
-		} else {
-			verticals = []
-			horizontals = []
-
-			// Lines and rows from this tile
-			for (let i = 0; i < this.sizeY; i++) {
-				verticals.push(this.y + i)
-			}
-			for (let i = 0; i < this.sizeX; i++) {
-				horizontals.push(this.x + i)
-			}
-
-			this.verticals = verticals
-			this.horizontals = horizontals
-		}
-
 		// Verify if has any equals lines and rows
 		if (tile.xDirection != 0) {
 			for (let i = 0; i < tile.sizeY; i++) {
-				if (verticals.includes(tile.y + i)) return true
+				if (this.verticals.includes(tile.y + i)) return true
 			}
 		} else if (tile.yDirection != 0) {
 			for (let i = 0; i < tile.sizeX; i++) {
-				if (horizontals.includes(tile.x + i)) return true
+				if (this.horizontals.includes(tile.x + i)) return true
 			}
 		}
 
@@ -467,12 +453,19 @@ class Tile {
 		// up = 0 or down = 2
 		if (this.yDirection != 0) {
 			return this.moveUpDown()
+		} else if (this.xDirection != 0) {
+			return this.moveLeftRight()
 		}
 
 		return false
 	}
 
 	moveUpDown () {
+		let condition = (direction, first, second) => {
+			if (direction < 0) return first >= second
+			else if (direction > 0) return first <= second
+		}
+
 		let direction = this.direction == 0 ? 'up' : 'down'
 		let actualY = this.y
 		let border = 0 // up
@@ -483,7 +476,8 @@ class Tile {
 		}
 
 		// If is on up border
-		if (this.y == 0 || actualY == gridSizeY - 1) {
+		if ((this.yDirection < 0 && this.y == 0) || (this.yDirection > 0 && actualY == border)) {
+			debugConsole('exited by the border')
 			return true
 		} else {
 			debugConsole('search direction', direction, 'start from line', actualY)
@@ -516,22 +510,125 @@ class Tile {
 		if (actualY == border) {
 			// Se saiu do grid
 			return true
-		} else if (this.y != actualY) {
-			// Se o limite não foi a borda do grid
-			this.translate(this.x, actualY)
+		} else {
+			// Abranger o tamanho do tile caso seja para uma direção positiva
+			if (this.xDirection == 1) {
+				actualX -= (this.sizeX - 1)
+			}
+
+			if (this.y != actualY) {
+				debugConsole('dont exited, but translated')
+
+				// Se o limite não foi a borda do grid
+				this.translate(this.x, actualY)
+			}
+		}
+	}
+
+	moveLeftRight () {
+		let condition = (direction, first, second) => {
+			if (direction > 0) return first <= second
+			else if (direction < 0) return first >= second
+		}
+
+		let direction = this.direction == 1 ? 'right' : 'left'
+		let actualX = this.x
+		let border = 0 // left
+		if (this.xDirection > 0) {
+			// right
+			actualX += this.sizeX - 1
+			border = gridSizeX - 1
+		}
+
+		// If is on up border
+		if ((this.xDirection < 0 && this.x == 0) || (this.xDirection > 0 && actualX == border)) {
+			return true
+		} else {
+			debugConsole('search direction', direction, 'start from collumn', actualX)
+			// validate if the tiles up or down are free
+			// collumn by collumn
+			for (let i = actualX + this.xDirection; condition(this.xDirection, i, border); i += this.xDirection) {
+				debugConsole('verify collumn', i)
+				let allFree = true
+				for (let y of this.verticals) {
+					debugConsole(i, y)
+					if (grid[ i ][ y ]) {
+						debugConsole('the collumn', i, 'on line', y, 'isnt free')
+						allFree = false
+						break
+					}
+				}
+
+				if (allFree) {
+					debugConsole('collumn', i, 'is all free')
+					actualX = i
+				} else {
+					debugConsole('collumn', i, "isn't all free")
+					break
+				}
+
+			}
+
+			debugConsole('the most clean collumn is', actualX)
+		}
+
+		if (actualX == border) {
+			// Se saiu do grid
+			return true
+		} else {
+			// Abranger o tamanho do tile caso seja para uma direção positiva
+			if (this.xDirection == 1) {
+				actualX -= (this.sizeX - 1)
+			}
+
+			if (this.x != actualX) {
+				debugConsole('dont exited, but translated')
+
+				// Se o limite não foi a borda do grid
+				this.translate(actualX, this.y)
+			}
 		}
 	}
 
 	translate (newX, newY) {
+		this.removeFromGrid()
+
 		this.x = newX
 		this.y = newY
+
+		this.calculatePoints()
+		this.placeNewPositionOnGrid()
 	}
 
-	cleanGrid () {
+	// Called when exit the grid
+	removeFromGrid () {
 		for (let x = 0; x < this.sizeX; x++) {
 			for (let y = 0; y < this.sizeY; y++) {
 				grid[ this.x + x ][ this.y + y ] = false
+				debugConsole('removed x', this.x + x, this.y + y)
 			}
+		}
+	}
+
+	placeNewPositionOnGrid () {
+		grid[ this.x ][ this.y ] = true;
+		for (let i = 0; i < this.sizeX; i++) {
+			for (let j = 0; j < this.sizeY; j++) {
+				if (this.x + i < gridSizeX && this.y + j < gridSizeY) grid[ this.x + i ][ this.y + j ] = true;
+			}
+		}
+	}
+
+	calculateArea () {
+		this.verticals = []
+		this.horizontals = []
+
+		// Lines and rows from this tile
+		for (let i = 0; i < this.sizeY; i++) {
+			this.verticals.push(this.y + i)
+		}
+		for (let i = 0; i < this.sizeX; i++) {
+			this.horizontals.push(this.x + i)
 		}
 	}
 }
