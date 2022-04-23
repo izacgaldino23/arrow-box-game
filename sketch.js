@@ -1,6 +1,7 @@
 const [ gridSizeX, gridSizeY ] = [ 20, 20 ];
-const tileSize = 50;
+const tileSize = 40;
 const initialTiles = 80;
+const debug = true
 let grid = [];
 
 let tiles = [];
@@ -40,10 +41,11 @@ function draw () {
 
 	translate(xGrid, yGrid);
 
-	// drawGuideLines();
+	drawGuideLines();
 	tiles.map((t) => {
 		t.draw();
 	});
+	drawGridCompletion()
 
 	// noLoop();
 }
@@ -53,10 +55,11 @@ function mouseClicked () {
 	for (let i in tiles) {
 		t = tiles[ i ]
 		if (t.isInside(mouseX - xGrid, mouseY - yGrid)) {
-			console.log(t)
+			debugConsole(t)
 			t.color = colors.clickedTile
 
 			if (t.move()) {
+				t.cleanGrid()
 				tiles.splice(i, 1)
 			}
 
@@ -113,13 +116,13 @@ function generateTile (tempType, tempX, tempY) {
 
 		// Complete grid coordenates
 		grid[ x ][ y ] = true;
-		if (!tempType) {
-			for (let i = 0; i < type.sizeX; i++) {
-				for (let j = 0; j < type.sizeY; j++) {
-					if (x + i < gridSizeX && y + j < gridSizeY) grid[ x + i ][ y + j ] = true;
-				}
+		for (let i = 0; i < type.sizeX; i++) {
+			for (let j = 0; j < type.sizeY; j++) {
+				if (x + i < gridSizeX && y + j < gridSizeY) grid[ x + i ][ y + j ] = true;
 			}
 		}
+		// if (!tempType) {
+		// }
 
 		return { x, y, type };
 	}
@@ -186,12 +189,28 @@ function drawGuideLines () {
 	stroke(colors.lineColor);
 	for (let i = 0; i <= gridSizeX; i++) {
 		line(i * tileSize, 0, i * tileSize, tileSize * gridSizeY);
+		text(i != gridSizeX ? i : 'X', i * tileSize + tileSize / 2, yGrid - tileSize * 3)
 	}
 
 	for (let i = 0; i <= gridSizeY; i++) {
 		line(0, i * tileSize, tileSize * gridSizeX, i * tileSize);
+		text(i != gridSizeX ? i : 'Y', xGrid - tileSize * 3, i * tileSize + tileSize / 2)
 	}
 	pop();
+}
+
+function drawGridCompletion () {
+	push()
+	stroke(255, 0, 0)
+	strokeWeight(5)
+	for (let i in grid) {
+		for (let j in grid[ i ]) {
+			if (grid[ i ][ j ]) {
+				point(i * tileSize + tileSize / 2, j * tileSize + tileSize / 2)
+			}
+		}
+	}
+	pop()
 }
 
 function roundCorners (points) {
@@ -230,13 +249,22 @@ function roundCorners (points) {
 	return points
 }
 
+function debugConsole (...params) {
+	if (debug) console.log(...params)
+}
+
+function condition (direction, first, second) {
+	if (direction < 0) return first >= second
+	else if (direction > 0) return first <= second
+}
+
 // ===================== CLASSES
 
 class Tile {
 	constructor({ name, points, sizeX, sizeY }, x, y, gridX, gridY) {
 		this.id = tileID++
 
-		this.points = [];
+		this.originalPoints = points;
 		this.x = gridX
 		this.y = gridY
 		this.invalid = false
@@ -244,9 +272,7 @@ class Tile {
 		this.sizeX = sizeX
 		this.sizeY = sizeY
 
-		points.map((p) => {
-			this.points.push(createVector(x + p[ 0 ], y + p[ 1 ]));
-		});
+		this.calculatePoints()
 
 		this.direction = this.generateDirection()
 
@@ -258,6 +284,17 @@ class Tile {
 		);
 
 		this.color = colors.tile
+	}
+
+	calculatePoints () {
+		let x = this.x * tileSize
+		let y = this.y * tileSize
+
+		this.points = []
+
+		this.originalPoints.map((p) => {
+			this.points.push(createVector(x + p[ 0 ], y + p[ 1 ]));
+		});
 	}
 
 	draw () {
@@ -354,18 +391,15 @@ class Tile {
 				let parallel = this.isParallel(t)
 
 				if (parallel) {
-					// console.log(this.id, t.id, parallel)
 
 					if (x != 0 && t.xDirection != 0) {
 						if (t.xDirection == x * -1) {
 							oposite = true
-							// console.log('oposto')
 							break
 						}
 					} else if (y != 0 && t.yDirection != 0) {
 						if (t.yDirection == y * -1) {
 							oposite = true
-							// console.log('oposto')
 							break
 						}
 					} else {
@@ -382,7 +416,7 @@ class Tile {
 
 			this.stack--
 			if (this.stack <= 0) {
-				console.log('stack limit')
+				// debugConsole('stack limit')
 				this.invalid = true
 				break
 			}
@@ -430,26 +464,75 @@ class Tile {
 
 	// return true if exits from the grid
 	move () {
-		// The move is based of direction of this tile
-
-		// up = 0
-		if (this.direction == 0) {
-			// If is on up border
-			if (this.y == 0) {
-				return true
-			} else {
-				// Validate if has any other tile in the path
-				let actualX = this.x
-				let max = actualX
-				for (let tile of tiles) {
-					for (let y of this.horizontals) {
-						grid[ actualX ]
-					}
-				}
-			}
+		// up = 0 or down = 2
+		if (this.yDirection != 0) {
+			return this.moveUpDown()
 		}
 
 		return false
+	}
+
+	moveUpDown () {
+		let direction = this.direction == 0 ? 'up' : 'down'
+		let actualY = this.y
+		let border = 0 // up
+		if (this.yDirection > 0) {
+			// down
+			actualY += this.sizeY - 1
+			border = gridSizeY - 1
+		}
+
+		// If is on up border
+		if (this.y == 0 || actualY == gridSizeY - 1) {
+			return true
+		} else {
+			debugConsole('search direction', direction, 'start from line', actualY)
+			// validate if the tiles up or doww are free
+			// line by line
+			for (let i = actualY + this.yDirection; condition(this.yDirection, i, border); i += this.yDirection) {
+				debugConsole('verify line', i)
+				let allFree = true
+				for (let x of this.horizontals) {
+					if (grid[ x ][ i ]) {
+						debugConsole('the line', i, 'on col', x, 'isnt free')
+						allFree = false
+						break
+					}
+				}
+
+				if (allFree) {
+					debugConsole('line', i, 'is all free')
+					actualY = i
+				} else {
+					debugConsole('line', i, "isn't all free")
+					break
+				}
+
+			}
+
+			debugConsole('the most clean line is', actualY)
+		}
+
+		if (actualY == border) {
+			// Se saiu do grid
+			return true
+		} else if (this.y != actualY) {
+			// Se o limite não foi a borda do grid
+			this.translate(this.x, actualY)
+		}
+	}
+
+	translate (newX, newY) {
+		this.x = newX
+		this.y = newY
+	}
+
+	cleanGrid () {
+		for (let x = 0; x < this.sizeX; x++) {
+			for (let y = 0; y < this.sizeY; y++) {
+				grid[ this.x + x ][ this.y + y ] = false
+			}
+		}
 	}
 }
 
