@@ -1,6 +1,6 @@
-const [ gridSizeX, gridSizeY ] = [ 5, 5 ];
+const [ gridSizeX, gridSizeY ] = [ 20, 20 ];
 const tileSize = 40;
-const initialTiles = 5;
+const initialTiles = 140;
 const debug = false
 let grid = [];
 let tiles = [];
@@ -41,7 +41,7 @@ function draw () {
 	tiles.map((t) => {
 		t.draw();
 	});
-	drawGridCompletion()
+	// drawGridCompletion()
 
 	// noLoop();
 }
@@ -142,6 +142,7 @@ function completeTiles () {
 		typeOftiles.reverse()
 		reversed = true
 	}
+
 	for (let i = 0; i < gridSizeY; i++) {
 		for (let j = 0; j < gridSizeX; j++) {
 			value = grid[ j ][ i ];
