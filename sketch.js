@@ -1,6 +1,6 @@
-const [ gridSizeX, gridSizeY ] = [ 20, 20 ];
+const [ gridSizeX, gridSizeY ] = [ 10, 10 ];
 const tileSize = 40;
-const initialTiles = 140;
+const initialTiles = 50;
 const debug = false
 let grid = [];
 let tiles = [];
@@ -10,6 +10,7 @@ let tileID = 1
 let xGrid, yGrid;
 let colors = {}
 let reversed = false
+let velocity = 0.2
 
 function setup () {
 	createCanvas(1000, 1000);
@@ -39,6 +40,7 @@ function draw () {
 
 	// drawGuideLines();
 	tiles.map((t) => {
+		t.update();
 		t.draw();
 	});
 	// drawGridCompletion()
@@ -49,11 +51,11 @@ function draw () {
 function mouseClicked () {
 	// verify is is clicked inside a tile
 	for (let i in tiles) {
-		if (i == 0) console.log('teste')
 		t = tiles[ i ]
 		if (t.isInside(mouseX - xGrid, mouseY - yGrid)) {
 			debugConsole(t)
 			// t.color = colors.clickedTile
+			console.log(t)
 
 			if (t.move()) {
 				t.removeFromGrid()
@@ -285,6 +287,7 @@ class Tile {
 		this.direction = this.generateDirection()
 
 		this.color = colors.tile
+		this.animating = false
 	}
 
 	calculatePoints () {
@@ -307,19 +310,58 @@ class Tile {
 
 	draw () {
 		fill(this.color)
-		// noFill()
-		beginShape();
 
-		this.points.map((p) => {
-			vertex(p.x, p.y);
-		});
+		rect(this.points[ 0 ].x, this.points[ 0 ].y, tileLongEndWithPadding(this.sizeX), tileLongEndWithPadding(this.sizeY), 5)
 
-		endShape(CLOSE);
+		// beginShape();
+
+		// this.points.map((p) => {
+		// 	vertex(p.x, p.y);
+		// });
+
+		// endShape(CLOSE);
 
 		this.drawArrow()
-		// push()
-		// text(`${this.id}`, this.points[0].x - 10, this.points[0].y + 10)
-		// pop()
+	}
+
+	update () {
+		if (this.animating) {
+			if (this.xDirection < 0) { // left
+				if (this.x > this.xDestiny) {
+					this.x -= velocity
+				} else {
+					this.animating = false
+					this.x = this.xDestiny
+				}
+			} else if (this.xDirection > 0) { // right
+				if (this.x < this.xDestiny) {
+					this.x += velocity
+				} else {
+					this.animating = false
+					this.x = this.xDestiny
+				}
+			} else if (this.yDirection < 0) { // up
+				if (this.y > this.yDestiny) {
+					this.y -= velocity
+				} else {
+					this.animating = false
+					this.y = this.yDestiny
+				}
+			} else if (this.yDirection > 0) { // bottom
+				if (this.y < this.yDestiny) {
+					this.y += velocity
+				} else {
+					this.animating = false
+					this.y = this.yDestiny
+				}
+			}
+
+			if (!this.animating) {
+				this.placeNewPositionOnGrid()
+			}
+
+			this.calculatePoints()
+		}
 	}
 
 	drawArrow () {
@@ -513,8 +555,8 @@ class Tile {
 			return true
 		} else {
 			// Abranger o tamanho do tile caso seja para uma direção positiva
-			if (this.xDirection == 1) {
-				actualX -= (this.sizeX - 1)
+			if (this.yDirection == 1) {
+				actualY -= (this.sizeY - 1)
 			}
 
 			if (this.y != actualY) {
@@ -594,11 +636,9 @@ class Tile {
 	translate (newX, newY) {
 		this.removeFromGrid()
 
-		this.x = newX
-		this.y = newY
-
-		this.calculatePoints()
-		this.placeNewPositionOnGrid()
+		this.animating = true
+		this.xDestiny = newX
+		this.yDestiny = newY
 	}
 
 	// Called when exit the grid
@@ -635,9 +675,9 @@ class Tile {
 }
 
 // ======================
-const tilePadding = 4;
+const tilePadding = 2;
 const tileEndWithPadding = tileSize - tilePadding;
-const tileLongEndWithPadding = (size) => tileSize * size - tilePadding;
+const tileLongEndWithPadding = (size) => tileSize * size - tilePadding * 2;
 
 const typeOftiles = [
 	{
