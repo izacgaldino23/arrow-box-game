@@ -2,7 +2,16 @@ const [ gridSizeX, gridSizeY ] = [ 10, 10 ];
 const tileSize = 40;
 const initialTiles = 50;
 const debug = false
+const UP = 0
+const RIGHT = 1
+const DOWN = 2
+const LEFT = 3
+
+
 let grid = [];
+/**
+ * @type {Tile[]}
+ */
 let tiles = [];
 let tries = [];
 let tileID = 1
@@ -19,6 +28,7 @@ function setup () {
 	yGrid = (height - tileSize * gridSizeY) / 2;
 
 	colors.tile = color(220)
+	colors.wrongTile = color(255, 100, 100)
 	colors.clickedTile = color(200, 50, 50)
 	colors.lineColor = color(20)
 
@@ -39,6 +49,8 @@ function draw () {
 	translate(xGrid, yGrid);
 
 	// drawGuideLines();
+	strokeWeight(2)
+	stroke(50)
 	tiles.map((t) => {
 		t.update();
 		t.draw();
@@ -55,7 +67,7 @@ function mouseClicked () {
 		if (t.isInside(mouseX - xGrid, mouseY - yGrid)) {
 			debugConsole(t)
 			// t.color = colors.clickedTile
-			console.log(t)
+			console.log(t, i)
 
 			if (t.move()) {
 				t.removeFromGrid()
@@ -119,6 +131,7 @@ function generateTile (tempType, tempX, tempY) {
 	}
 
 	let tile = new Tile(type, posX, posY, x, y);
+	if (tempX) tile.color = color(255, 255, 100)
 
 	let valid = isValidTile(tile, posX, posY);
 
@@ -132,8 +145,6 @@ function generateTile (tempType, tempX, tempY) {
 				if (x + i < gridSizeX && y + j < gridSizeY) grid[ x + i ][ y + j ] = true;
 			}
 		}
-		// if (!tempType) {
-		// }
 
 		return { x, y, type };
 	}
@@ -163,12 +174,18 @@ function completeTiles () {
 	}
 }
 
+/**
+ * 
+ * @param {Tile} tile 
+ * @param {number} x 
+ * @param {number} y 
+ * @returns bool
+ */
 function isValidTile (tile, x, y) {
 	let valid = true;
 
 	// validate if the points is out of bounds
 	for (let p of tile.points) {
-		let inside = false;
 
 		if (p.x > tileSize * gridSizeX || p.y > tileSize * gridSizeY) {
 			valid = false;
@@ -178,6 +195,7 @@ function isValidTile (tile, x, y) {
 
 	// validate if a tile is inside another
 	for (let t of tiles) {
+		let inside
 		for (let p of tile.points) {
 			inside = t.isInside(p.x, p.y);
 			if (inside) break;
@@ -192,11 +210,15 @@ function isValidTile (tile, x, y) {
 		}
 	}
 
-	if (this.invalid) {
-		valid = false
+	valid = this.invalid ? false : valid
+
+	// Validar se gera loop
+	if (valid) {
+		let loop = calculateLoop(tile, 0, tile.id)
+		if (loop) valid = false
 	}
 
-	return valid;
+	return valid
 }
 
 function drawGuideLines () {
@@ -268,6 +290,57 @@ function debugConsole (...params) {
 	if (debug) console.log(...params)
 }
 
+/**
+ * 
+ * @param {Tile} tile 
+ * @param {number} index
+ * @param {number} firstTileID
+ * @returns bool
+ */
+function calculateLoop (tile, index = 0, firstTileID = 0) {
+	let nexts = tile.getNextTiles()
+	let loop = false
+
+	if (index >= 4) return loop
+
+	for (let t of nexts) {
+		// tile.color = color(100, 255, 100)
+		// t.color = color(255, 100, 100)
+		if (index == 3) {
+			// Valida se algum dos proximo é o primeiro elemento
+			if (t.id == firstTileID) {
+				loop = true
+				break
+			}
+		} else {
+			// Faz a proxima iteração
+			loop = calculateLoop(t, index + 1, firstTileID == 0 ? tile.id : firstTileID)
+		}
+	}
+
+	return loop
+}
+
+/**
+ * 
+ * @param {number} x 
+ * @param {number} y 
+ * @returns Tile
+ */
+function getTileByPosition (x, y) {
+	for (let t of tiles) {
+		if (
+			x >= t.x && x <= t.x + t.sizeX - 1 &&
+			y >= t.y && y <= t.y + t.sizeY - 1
+		) {
+			// t.color = color(255, 100, 100)
+			return t
+		}
+	}
+
+	return null
+}
+
 // ===================== CLASSES
 
 class Tile {
@@ -284,9 +357,9 @@ class Tile {
 
 		this.calculatePoints()
 
+		this.color = colors.tile
 		this.direction = this.generateDirection()
 
-		this.color = colors.tile
 		this.animating = false
 	}
 
@@ -369,22 +442,22 @@ class Tile {
 		const arrowLateral = 5
 
 		switch (this.direction) {
-			case 0: // UP
+			case UP: // UP
 				line(this.center.x, this.center.y + arrowSize, this.center.x, this.center.y - arrowSize)
 				line(this.center.x - arrowLateral, this.center.y, this.center.x, this.center.y - arrowSize)
 				line(this.center.x + arrowLateral, this.center.y, this.center.x, this.center.y - arrowSize)
 				break
-			case 1:  // RIGHT
+			case RIGHT:  // RIGHT
 				line(this.center.x - arrowSize, this.center.y, this.center.x + arrowSize, this.center.y)
 				line(this.center.x, this.center.y - arrowLateral, this.center.x + arrowSize, this.center.y)
 				line(this.center.x, this.center.y + arrowLateral, this.center.x + arrowSize, this.center.y)
 				break
-			case 2:  // DOWN
+			case DOWN:  // DOWN
 				line(this.center.x, this.center.y + arrowSize, this.center.x, this.center.y - arrowSize)
 				line(this.center.x - arrowLateral, this.center.y, this.center.x, this.center.y + arrowSize)
 				line(this.center.x + arrowLateral, this.center.y, this.center.x, this.center.y + arrowSize)
 				break
-			case 3:  // LEFT
+			case LEFT:  // LEFT
 				line(this.center.x - arrowSize, this.center.y, this.center.x + arrowSize, this.center.y)
 				line(this.center.x, this.center.y - arrowLateral, this.center.x - arrowSize, this.center.y)
 				line(this.center.x, this.center.y + arrowLateral, this.center.x - arrowSize, this.center.y)
@@ -407,7 +480,7 @@ class Tile {
 
 	generateDirection () {
 		let direction, oposite = true
-		this.stack = 100
+		this.stack = 200
 		this.calculateArea()
 
 		while (oposite) {
@@ -418,16 +491,16 @@ class Tile {
 			let x = 0, y = 0
 
 			switch (direction) {
-				case 0:
+				case UP:
 					y--
 					break
-				case 1:
+				case RIGHT:
 					x++
 					break
-				case 2:
+				case DOWN:
 					y++
 					break
-				case 3:
+				case LEFT:
 					x--
 					break
 			}
@@ -469,6 +542,7 @@ class Tile {
 			if (this.stack <= 0) {
 				// debugConsole('stack limit')
 				this.invalid = true
+				this.color = colors.wrongTile
 				break
 			}
 		}
@@ -672,10 +746,56 @@ class Tile {
 			this.horizontals.push(this.x + i)
 		}
 	}
+
+	/**
+	 * @returns {Tile[]}
+	 */
+	getNextTiles () {
+		let nexts = []
+		let ids = []
+
+		if (this.isOnBorder()) return nexts
+
+		for (let i = 0; i <= this.sizeX - 1; i++) {
+			for (let j = 0; j <= this.sizeY - 1; j++) {
+				let tile = getTileByPosition(this.x + i + this.xDirection, this.y + j + this.yDirection)
+				if (tile != null && this.id != tile.id) {
+					nexts.push(tile)
+					ids.push(tile.id)
+				}
+			}
+		}
+
+		return nexts
+	}
+
+	/**
+	 * @returns bool
+	 */
+	isOnBorder () {
+		let is = false
+
+		switch (this.direction) {
+			case UP: // UP
+				if (this.y == 0) is = true
+				break
+			case RIGHT:  // RIGHT
+				if (this.x + this.sizeX == gridSizeX) is = true
+				break
+			case DOWN:  // DOWN
+				if (this.y + this.sizeY == gridSizeY) is = true
+				break
+			case LEFT:  // LEFT
+				if (this.x == 0) is = true
+				break
+		}
+
+		return is
+	}
 }
 
 // ======================
-const tilePadding = 2;
+const tilePadding = 3;
 const tileEndWithPadding = tileSize - tilePadding;
 const tileLongEndWithPadding = (size) => tileSize * size - tilePadding * 2;
 
